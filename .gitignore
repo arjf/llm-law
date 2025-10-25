@@ -1,1 +1,4 @@
 .conda
+*zilliz*
+cache
+.env

@@ -71,8 +71,8 @@ class Config:
     bf16 = True  # Better numerical stability than FP16
 
     # Quick test mode
-    max_train_samples = 5000  # Set to 5000 for quick test
-    max_eval_samples = 1000  # Set to 1000 for quick test
+    max_train_samples = None  # Set to 5000 for quick test
+    max_eval_samples = None  # Set to 1000 for quick test
 
     # Paths
     cache_dir = "./cache"
