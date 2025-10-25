@@ -1,0 +1,207 @@
+================================================================================
+HIERARCHICAL INLEGALBERT - RESTRUCTURED PROJECT STRUCTURE
+================================================================================
+
+lawer-indian/
+│
+├── 📄 train.py                              # NEW MAIN ENTRY POINT ⭐
+│   └── Cleaner, modular main script that imports from src/
+│
+├── 📄 train_hierarchical_multi_gpu.py      # ORIGINAL FILE (PRESERVED)
+│   └── Original monolithic script (kept as-is for backward compatibility)
+│
+├── 📁 src/                                  # MAIN SOURCE PACKAGE
+│   │
+│   ├── 📄 __init__.py                      # Package initialization
+│   │   └── Exports: Config, models, data, training, utils
+│   │
+│   ├── 📁 config/                          # CONFIGURATION MODULE
+│   │   ├── 📄 __init__.py
+│   │   └── 📄 config.py                    # Config class
+│   │       ├── Model architecture settings
+│   │       ├── Training hyperparameters
+│   │       ├── Data paths
+│   │       ├── W&B settings
+│   │       └── Distributed training config
+│   │
+│   ├── 📁 models/                          # MODEL ARCHITECTURES
+│   │   ├── 📄 __init__.py
+│   │   └── 📄 hierarchical_model.py        # HierarchicalInLegalBERT
+│   │       ├── BERT encoder (InLegalBERT)
+│   │       ├── BiGRU layer
+│   │       ├── Attention mechanism
+│   │       └── Classification head
+│   │
+│   ├── 📁 data/                            # DATA PIPELINE
+│   │   ├── 📄 __init__.py
+│   │   └── 📄 dataset.py
+│   │       ├── load_ildc_dataset()         # Load from HuggingFace
+│   │       └── ILDCDataset                 # PyTorch Dataset class
+│   │           ├── __init__()
+│   │           ├── __len__()
+│   │           ├── chunk_text()            # Hierarchical chunking
+│   │           └── __getitem__()           # Data preprocessing
+│   │
+│   ├── 📁 training/                        # TRAINING PIPELINE
+│   │   ├── 📄 __init__.py
+│   │   ├── 📄 trainer.py                   # Core training functions
+│   │   │   ├── train_epoch()               # Single epoch training
+│   │   │   │   ├── Forward pass
+│   │   │   │   ├── Loss computation
+│   │   │   │   ├── Backward pass
+│   │   │   │   ├── Mixed precision (BF16)
+│   │   │   │   └── Gradient clipping
+│   │   │   └── evaluate()                  # Model evaluation
+│   │   │       ├── Validation/Test loop
+│   │   │       └── Metrics computation
+│   │   └── 📄 train_loop.py                # Main training loop
+│   │       └── train()                     # Complete pipeline
+│   │           ├── Data loading
+│   │           ├── Model initialization
+│   │           ├── DDP setup
+│   │           ├── Optimizer & scheduler
+│   │           ├── Training epochs
+│   │           ├── Validation
+│   │           ├── Checkpointing
+│   │           ├── Test evaluation
+│   │           └── W&B logging
+│   │
+│   └── 📁 utils/                           # UTILITIES
+│       ├── 📄 __init__.py
+│       ├── 📄 distributed.py               # Multi-GPU utilities
+│       │   ├── setup_distributed()         # Initialize DDP
+│       │   ├── cleanup_distributed()       # Cleanup
+│       │   └── is_main_process()           # Process checking
+│       ├── 📄 helpers.py                   # General utilities
+│       │   └── set_seed()                  # Reproducibility
+│       └── 📄 wandb_utils.py               # W&B integration
+│           └── setup_wandb()               # Experiment tracking
+│
+├── 📄 README_STRUCTURE.md                  # Documentation for new structure
+├── 📄 PROJECT_STRUCTURE.txt                # This file
+├── 📄 VALIDATION_REPORT.md                 # Code validation results
+│
+├── 📁 models/                              # Model checkpoints (created during training)
+│   └── hierarchical_inlegalbert/
+│       ├── best_model.pt
+│       ├── config.json
+│       └── tokenizer files
+│
+└── 📁 cache/                               # Cached datasets and models
+
+
+================================================================================
+USAGE EXAMPLES
+================================================================================
+
+1. USING NEW MODULAR STRUCTURE (RECOMMENDED):
+
+   torchrun --nproc_per_node=2 train.py
+   torchrun --nproc_per_node=2 train.py --epochs 10 --batch_size 16
+   torchrun --nproc_per_node=2 train.py --quick_test
+
+
+2. USING ORIGINAL SCRIPT (BACKWARD COMPATIBLE):
+
+   torchrun --nproc_per_node=2 train_hierarchical_multi_gpu.py
+
+
+================================================================================
+MODULE DEPENDENCIES
+================================================================================
+
+train.py
+    ├── src.config.Config
+    ├── src.utils.setup_distributed()
+    ├── src.utils.cleanup_distributed()
+    ├── src.utils.is_main_process()
+    └── src.training.train()
+            ├── src.data.load_ildc_dataset()
+            ├── src.data.ILDCDataset
+            ├── src.models.HierarchicalInLegalBERT
+            ├── src.training.train_epoch()
+            ├── src.training.evaluate()
+            ├── src.utils.setup_wandb()
+            └── src.utils.set_seed()
+
+
+================================================================================
+KEY IMPROVEMENTS
+================================================================================
+
+✅ MODULARITY
+   - Single Responsibility Principle
+   - Each module has one clear purpose
+   - Easy to understand and navigate
+
+✅ MAINTAINABILITY
+   - Changes isolated to specific files
+   - No duplicate code
+   - Clear separation of concerns
+
+✅ REUSABILITY
+   - Import individual components
+   - Use models/data independently
+   - Easy to extend and customize
+
+✅ TESTABILITY
+   - Unit test individual modules
+   - Mock dependencies easily
+   - Debug specific components
+
+✅ SCALABILITY
+   - Add new models easily
+   - Support multiple datasets
+   - Team collaboration friendly
+
+
+================================================================================
+MIGRATION NOTES
+================================================================================
+
+- Original file: train_hierarchical_multi_gpu.py (UNCHANGED)
+- New entry point: train.py (USE THIS)
+- All functionality preserved
+- Same training behavior
+- Identical results
+- No breaking changes
+
+
+================================================================================
+FILE SIZES (APPROXIMATE)
+================================================================================
+
+Original: train_hierarchical_multi_gpu.py    ~770 lines (monolithic)
+
+New Structure:
+├── train.py                                  ~87 lines
+├── src/config/config.py                      ~59 lines
+├── src/models/hierarchical_model.py          ~71 lines
+├── src/data/dataset.py                       ~118 lines
+├── src/training/trainer.py                   ~122 lines
+├── src/training/train_loop.py                ~278 lines
+├── src/utils/distributed.py                  ~44 lines
+├── src/utils/helpers.py                      ~17 lines
+└── src/utils/wandb_utils.py                  ~35 lines
+
+Total: ~831 lines (organized across 10 files)
+
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+Configuration       → src/config/config.py
+Model Definition    → src/models/hierarchical_model.py
+Data Loading        → src/data/dataset.py
+Training Logic      → src/training/trainer.py
+Training Pipeline   → src/training/train_loop.py
+Multi-GPU Setup     → src/utils/distributed.py
+Utilities           → src/utils/helpers.py
+W&B Logging         → src/utils/wandb_utils.py
+Main Entry Point    → train.py
+
+
+================================================================================
+END OF STRUCTURE DOCUMENTATION
+================================================================================

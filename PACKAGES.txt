@@ -1,0 +1,24 @@
+# Required Packages for Hierarchical InLegalBERT Training
+
+# Core Deep Learning
+torch
+transformers
+
+# Data Processing
+datasets
+numpy
+
+# Machine Learning Utilities
+scikit-learn
+
+# Distributed Training (optional but recommended)
+accelerate
+
+# Experiment Tracking
+wandb
+
+# Progress Bars & Utilities
+tqdm
+
+# Note: Install with:
+# pip install torch transformers datasets numpy scikit-learn accelerate wandb tqdm
