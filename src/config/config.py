@@ -43,6 +43,11 @@ class Config:
     wandb_run_name = "hierarchical-inlegalbert-4090x2"
     use_wandb = True
 
+    # HuggingFace Hub
+    push_to_hub = False  # Set to True to push model to HF Hub
+    hub_model_id = None  # e.g., "your-username/hierarchical-inlegalbert"
+    hub_private_repo = False  # Set to True for private repository
+
     # DDP settings
     backend = "nccl"  # Best for NVIDIA GPUs
     find_unused_parameters = False

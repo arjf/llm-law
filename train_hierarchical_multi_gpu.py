@@ -83,6 +83,11 @@ class Config:
     wandb_run_name = "hierarchical-inlegalbert-4090x2"
     use_wandb = True
 
+    # HuggingFace Hub
+    push_to_hub = False  # Set to True to push model to HF Hub
+    hub_model_id = None  # e.g., "your-username/hierarchical-inlegalbert"
+    hub_private_repo = False  # Set to True for private repository
+
     # DDP settings
     backend = "nccl"  # Best for NVIDIA GPUs
     find_unused_parameters = False
@@ -684,6 +689,44 @@ def train(config, rank, world_size, local_rank, is_distributed):
 
             tokenizer.save_pretrained(config.output_dir)
 
+            # Push to HuggingFace Hub if enabled
+            if config.push_to_hub and config.hub_model_id:
+                try:
+                    print(
+                        f"\n📤 Pushing model to HuggingFace Hub: {config.hub_model_id}"
+                    )
+
+                    # Save model in HuggingFace format
+                    model_to_save.save_pretrained(
+                        config.output_dir,
+                        safe_serialization=True,
+                    )
+
+                    # Push to hub
+                    from huggingface_hub import HfApi
+
+                    api = HfApi()
+
+                    api.create_repo(
+                        repo_id=config.hub_model_id,
+                        private=config.hub_private_repo,
+                        exist_ok=True,
+                    )
+
+                    api.upload_folder(
+                        folder_path=config.output_dir,
+                        repo_id=config.hub_model_id,
+                        commit_message=f"Upload model - Epoch {epoch + 1} - F1: {best_f1:.4f}",
+                    )
+
+                    print(
+                        f"✓ Model pushed to https://huggingface.co/{config.hub_model_id}"
+                    )
+
+                except Exception as e:
+                    print(f"⚠ Failed to push to Hub: {e}")
+                    print("  Model saved locally. You can push manually later.")
+
     # Test evaluation (only main process)
     if is_main_process(rank):
         print("\n" + "=" * 60)
@@ -745,12 +788,37 @@ def main():
     parser.add_argument("--batch_size", type=int, default=12)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--quick_test", action="store_true")
+    parser.add_argument(
+        "--push_to_hub", action="store_true", help="Push model to HuggingFace Hub"
+    )
+    parser.add_argument(
+        "--hub_model_id",
+        type=str,
+        default=None,
+        help="HuggingFace Hub model ID (e.g., username/model-name)",
+    )
+    parser.add_argument(
+        "--hub_private",
+        action="store_true",
+        help="Make HuggingFace Hub repository private",
+    )
     args = parser.parse_args()
 
     # Update config
     Config.num_epochs = args.epochs
     Config.batch_size = args.batch_size
     Config.learning_rate = args.lr
+
+    # HuggingFace Hub settings
+    if args.push_to_hub:
+        Config.push_to_hub = True
+        Config.hub_model_id = args.hub_model_id
+        Config.hub_private_repo = args.hub_private
+
+        if not args.hub_model_id:
+            print("\n⚠ Warning: --push_to_hub requires --hub_model_id")
+            print("  Example: --hub_model_id username/hierarchical-inlegalbert")
+            Config.push_to_hub = False
 
     if args.quick_test:
         Config.max_train_samples = 5000

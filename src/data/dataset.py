@@ -67,7 +67,12 @@ class ILDCDataset(Dataset):
     def chunk_text(self, text):
         """Split text into overlapping chunks"""
 
-        tokens = self.tokenizer.tokenize(text)
+        # Suppress warnings for long sequences - we chunk them anyway
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Token indices sequence length")
+            tokens = self.tokenizer.tokenize(text)
         chunks = []
         stride = self.config.chunk_size - self.config.chunk_overlap
 

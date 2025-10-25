@@ -228,6 +228,44 @@ def train(config, rank, world_size, local_rank, is_distributed):
 
             tokenizer.save_pretrained(config.output_dir)
 
+            # Push to HuggingFace Hub if enabled
+            if config.push_to_hub and config.hub_model_id:
+                try:
+                    print(
+                        f"\n📤 Pushing model to HuggingFace Hub: {config.hub_model_id}"
+                    )
+
+                    # Save model in HuggingFace format
+                    model_to_save.save_pretrained(
+                        config.output_dir,
+                        safe_serialization=True,
+                    )
+
+                    # Push to hub
+                    from huggingface_hub import HfApi
+
+                    api = HfApi()
+
+                    api.create_repo(
+                        repo_id=config.hub_model_id,
+                        private=config.hub_private_repo,
+                        exist_ok=True,
+                    )
+
+                    api.upload_folder(
+                        folder_path=config.output_dir,
+                        repo_id=config.hub_model_id,
+                        commit_message=f"Upload model - Epoch {epoch + 1} - F1: {best_f1:.4f}",
+                    )
+
+                    print(
+                        f"✓ Model pushed to https://huggingface.co/{config.hub_model_id}"
+                    )
+
+                except Exception as e:
+                    print(f"⚠ Failed to push to Hub: {e}")
+                    print("  Model saved locally. You can push manually later.")
+
     # Test evaluation (only main process)
     if is_main_process(rank):
         print("\n" + "=" * 60)

@@ -17,8 +17,11 @@ accelerate
 # Experiment Tracking
 wandb
 
+# HuggingFace Hub Integration
+huggingface_hub
+
 # Progress Bars & Utilities
 tqdm
 
 # Note: Install with:
-# pip install torch transformers datasets numpy scikit-learn accelerate wandb tqdm
+# pip install torch transformers datasets numpy scikit-learn accelerate wandb huggingface_hub tqdm
