@@ -588,8 +588,8 @@ class ILTURDataPrep:
         """Load and combine all three tasks with specified ratios"""
         print("[DATA] Loading IL-TUR datasets...")
 
-        # Load datasets
-        pcr_ds = load_dataset("Exploration-Lab/IL-TUR", "pcr", split="train")
+        # Load datasets (note: PCR uses 'train_queries' split, others use 'train')
+        pcr_ds = load_dataset("Exploration-Lab/IL-TUR", "pcr", split="train_queries")
         lsi_ds = load_dataset("Exploration-Lab/IL-TUR", "lsi", split="train")
         summ_ds = load_dataset("Exploration-Lab/IL-TUR", "summ", split="train")
 
