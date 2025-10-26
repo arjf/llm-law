@@ -10,22 +10,21 @@ Environment Variables:
   MILVUS_COLLECTION
 
 Usage:
-  python iltur_multitask_finetune.py --build-rag-index   # Build vector DB first
-  python iltur_multitask_finetune.py --train             # Fine-tune model
-  python iltur_multitask_finetune.py --inference         # Test trained model
+
+  1. python rag.py --build-rag-index   # Build vector DB from ALL 8 tasks
+  2. python rag.py --train             # Fine-tune on 3 tasks (PCR, LSI, SUMM)
+  3. python rag.py --inference         # Test with factual generation params
 """
 
 import os
-import json
 import torch
 import numpy as np
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from tqdm import tqdm
 from datasets import load_dataset, concatenate_datasets, Dataset
 from transformers import AutoTokenizer, AutoModel, TextStreamer
 
 from pymilvus import (
-    MilvusClient,
     connections,
     FieldSchema,
     CollectionSchema,
@@ -146,7 +145,9 @@ class ZillizRAGIndexer:
     def _chunk_text(self, text: str) -> List[str]:
         """Chunk text with overlap"""
         # Truncate text to avoid tokenizer warnings (approx 4 chars per token)
-        max_chars = self.config.chunk_size * 16 * 4  # 16 max chunks * 512 tokens * ~4 chars
+        max_chars = (
+            self.config.chunk_size * 16 * 4
+        )  # 16 max chunks * 512 tokens * ~4 chars
         if len(text) > max_chars:
             text = text[:max_chars]
 
@@ -177,13 +178,17 @@ class ZillizRAGIndexer:
             # Some datasets have multiple splits we should load all of them
             subset_configs = {
                 "lner": ["fold_1", "fold_2", "fold_3"],  # Legal NER - all folds
-                "lsi": ["train"],   # Legal Statute Identification
+                "lsi": ["train"],  # Legal Statute Identification
                 "pcr": ["train_queries"],  # Prior Case Retrieval (use queries)
                 "summ": ["train"],  # Summarization
                 "cjpe": ["single_train"],  # Court Judgment Prediction
                 "bail": ["train_all"],  # Bail Prediction
                 "rr": ["CL_train"],  # Rhetorical Role (CL_train or IT_train)
-                "lmt": ["acts", "cci_faq", "ip"],  # Legal Machine Translation - all splits
+                "lmt": [
+                    "acts",
+                    "cci_faq",
+                    "ip",
+                ],  # Legal Machine Translation - all splits
             }
             print("[RAG] Building COMPREHENSIVE knowledge base from all 8 IL-TUR tasks")
         else:
@@ -202,7 +207,9 @@ class ZillizRAGIndexer:
                     print(f"[RAG] Loading {subset} dataset (split: {split_name})...")
                     ds = load_dataset(dataset_name, subset, split=split_name)
 
-                    for idx, item in enumerate(tqdm(ds, desc=f"Chunking {subset}_{split_name}")):
+                    for idx, item in enumerate(
+                        tqdm(ds, desc=f"Chunking {subset}_{split_name}")
+                    ):
                         # Extract text based on task type
                         if subset == "pcr":
                             text = item.get("query", item.get("text", ""))
@@ -232,14 +239,19 @@ class ZillizRAGIndexer:
                         for c_id, chunk in enumerate(chunks):
                             all_chunks.append(chunk)
                             label = f"{subset}_{split_name}_doc{idx}_chunk{c_id}"
-                            case_id = item.get("case_id", item.get("id", f"{subset}_{split_name}_{idx}"))
+                            case_id = item.get(
+                                "case_id",
+                                item.get("id", f"{subset}_{split_name}_{idx}"),
+                            )
                             if not isinstance(case_id, str):
                                 case_id = str(case_id)
                             all_labels.append(label)
                             all_case_ids.append(case_id)
 
                 except Exception as e:
-                    print(f"[RAG] Warning: Failed to load {subset} (split: {split_name}): {e}")
+                    print(
+                        f"[RAG] Warning: Failed to load {subset} (split: {split_name}): {e}"
+                    )
                     continue
 
         print(f"[RAG] Total chunks to index: {len(all_chunks)}")
@@ -260,6 +272,7 @@ class ZillizRAGIndexer:
 
         # Concatenate all embeddings
         import numpy as np
+
         all_embeddings = np.vstack(all_embeddings)
         print(f"[RAG] Encoded {len(all_embeddings)} embeddings")
 
@@ -274,7 +287,12 @@ class ZillizRAGIndexer:
             batch_labels = all_labels[i : i + batch_size]
             batch_case_ids = all_case_ids[i : i + batch_size]
 
-            entities = [batch_embeddings.tolist(), batch_texts, batch_labels, batch_case_ids]
+            entities = [
+                batch_embeddings.tolist(),
+                batch_texts,
+                batch_labels,
+                batch_case_ids,
+            ]
             self.collection.insert(entities)
 
             # Flush less frequently (every 20 batches instead of 10)
@@ -292,7 +310,9 @@ class ZillizRAGIndexer:
             "params": {"M": 16, "efConstruction": 200},
         }
         try:
-            self.collection.create_index(field_name="embedding", index_params=index_params)
+            self.collection.create_index(
+                field_name="embedding", index_params=index_params
+            )
             print("[RAG] Index created successfully")
         except Exception as e:
             if "already exists" in str(e).lower() or "distinct index" in str(e).lower():
@@ -350,23 +370,63 @@ class ILTURDataPrep:
         self.rag = rag_indexer
 
     def _format_pcr_with_rag(self, item: Dict) -> Dict:
-        """Prior Case Retrieval: Retrieve candidates, model ranks them"""
-        query_case = item.get("query", item.get("text", ""))[:1000]
+        """Prior Case Retrieval: Retrieve candidates, model ranks them
+
+        PCR dataset fields (actual from IL-TUR):
+        - text: The query case text (LIST of paragraphs)
+        - relevant_candidates: Ground truth relevant case IDs (LIST)
+        - id: Query case ID
+        """
+        # Extract query text - try multiple field names
+        query_case = item.get("text", item.get("query", item.get("query_text", "")))
+
+        # Handle list format (IL-TUR PCR uses list of paragraphs)
+        if isinstance(query_case, list):
+            query_case = " ".join([str(p) for p in query_case if p])
+
+        if not query_case:
+            query_case = "No query text available"
+        query_case = str(query_case)[:1000]
 
         # Use RAG to get candidate cases
         if self.rag:
-            candidates = self.rag.retrieve(query_case, top_k=10)
-            candidate_text = "\n\n".join(
-                [
-                    f"Candidate {i + 1}: {c['text'][:300]}..."
-                    for i, c in enumerate(candidates[:5])
-                ]
-            )
+            try:
+                candidates = self.rag.retrieve(query_case, top_k=10)
+                candidate_text = "\n\n".join(
+                    [
+                        f"Candidate {i + 1}: {c['text'][:300]}..."
+                        for i, c in enumerate(candidates[:5])
+                    ]
+                )
+            except Exception as e:
+                print(f"[WARNING] RAG retrieval failed: {e}")
+                candidate_text = "[RAG retrieval unavailable]"
         else:
             candidate_text = "[Candidates would be retrieved via RAG]"
 
-        # Ground truth (assuming dataset has "relevant_cases" field)
-        relevant = item.get("relevant_cases", item.get("label", "Case 1"))
+        # Ground truth - try multiple field names
+        # IL-TUR PCR uses: relevant_candidates (list of case IDs)
+        relevant = item.get(
+            "relevant_candidates",
+            item.get(
+                "relevant_cases",
+                item.get(
+                    "positive_cases",
+                    item.get(
+                        "label",
+                        item.get(
+                            "relevant_case_ids", "Relevant cases to be identified"
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        # Handle list format (IL-TUR provides lists of case IDs)
+        if isinstance(relevant, list):
+            relevant = ", ".join([str(r) for r in relevant[:5]])  # Top 5
+        else:
+            relevant = str(relevant)[:500]
 
         messages = [
             {
@@ -374,7 +434,7 @@ class ILTURDataPrep:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"[TASK: Prior Case Retrieval]\n\nQuery Case:\n{query_case}\n\nCandidate Cases:\n{candidate_text}\n\nRank these cases by legal relevance and explain why.",
+                        "text": f"[TASK: Prior Case Retrieval]\n\nQuery Case:\n{query_case}\n\nCandidate Cases:\n{candidate_text}\n\nRank these cases by legal relevance and explain your reasoning.",
                     }
                 ],
             },
@@ -383,7 +443,7 @@ class ILTURDataPrep:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Most Relevant: {relevant}\n\nReasoning: These cases share similar legal principles and factual patterns...",
+                        "text": f"Most Relevant: {relevant}\n\nReasoning: These cases share similar legal principles, factual patterns, and applicable statutes with the query case.",
                     }
                 ],
             },
@@ -391,9 +451,60 @@ class ILTURDataPrep:
         return {"conversations": messages}
 
     def _format_lsi(self, item: Dict) -> Dict:
-        """Legal Statute Identification: Facts -> Applicable statutes"""
-        facts = item.get("facts", item.get("text", ""))[:1000]
-        statutes = item.get("statutes", item.get("label", "Section 302 IPC"))
+        """Legal Statute Identification: Facts -> Applicable statutes
+
+        LSI dataset fields (actual from IL-TUR):
+        - text: Case facts/description (LIST of paragraphs)
+        - labels: Target statute label IDs (LIST of integers like [69, 9, 3])
+        - id: Case ID
+
+        IMPORTANT LIMITATION:
+        IL-TUR LSI uses numeric label IDs (e.g., [69, 9, 3]) instead of actual
+        statute text (e.g., "Section 302 IPC"). Without a label-to-statute mapping,
+        the model will learn to predict label IDs rather than statute names.
+
+        For production use, you should:
+        1. Obtain the label ID to statute name mapping from IL-TUR documentation
+        2. Convert numeric labels to actual statute text in this function
+        3. Or use a different dataset with direct statute annotations
+        """
+        # Extract facts - try multiple field names
+        facts = item.get("text", item.get("facts", item.get("case_description", "")))
+
+        # Handle list format (IL-TUR LSI uses list of paragraphs)
+        if isinstance(facts, list):
+            facts = " ".join([str(p) for p in facts if p])
+
+        if not facts:
+            facts = "No facts provided"
+        facts = str(facts)[:1000]
+
+        # Extract statutes - IL-TUR uses numeric label IDs
+        statutes = item.get(
+            "labels",
+            item.get(
+                "statutes",
+                item.get(
+                    "provisions",
+                    item.get(
+                        "label",
+                        item.get(
+                            "statute_labels", "Applicable statutes to be identified"
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        # Handle list format (IL-TUR provides lists of label IDs)
+        if isinstance(statutes, list):
+            if len(statutes) > 0:
+                # Format as label IDs (since we don't have label-to-statute mapping)
+                statutes = "Label IDs: " + ", ".join([str(s) for s in statutes])
+            else:
+                statutes = "No specific statutes labeled"
+        else:
+            statutes = str(statutes)[:500]
 
         messages = [
             {
@@ -410,7 +521,7 @@ class ILTURDataPrep:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Applicable Statutes:\n{statutes}\n\nReasoning: Based on the facts presented, these provisions are relevant because...",
+                        "text": f"Applicable Statutes:\n{statutes}\n\nReasoning: Based on the facts presented, these provisions are relevant because they directly address the legal issues, offenses, and circumstances described in the case.",
                     }
                 ],
             },
@@ -418,9 +529,46 @@ class ILTURDataPrep:
         return {"conversations": messages}
 
     def _format_summ(self, item: Dict) -> Dict:
-        """Summarization: Long document -> Concise summary"""
-        document = item.get("text", item.get("document", ""))[:2000]
-        summary = item.get("summary", "This case involves...")
+        """Summarization: Long document -> Concise summary
+
+        SUMM dataset fields (actual from IL-TUR):
+        - document: Full legal document (LIST of paragraphs)
+        - summary: Target summary (LIST of paragraphs)
+        - id: Document ID
+        - num_doc_tokens: Number of tokens in document
+        - num_summ_tokens: Number of tokens in summary
+        """
+        # Extract document - try multiple field names
+        document = item.get(
+            "document",
+            item.get("text", item.get("judgment", item.get("full_text", ""))),
+        )
+
+        # Handle list format (IL-TUR SUMM uses list of paragraphs)
+        if isinstance(document, list):
+            document = " ".join([str(p) for p in document if p])
+
+        if not document:
+            document = "No document text provided"
+        document = str(document)[:2000]
+
+        # Extract summary - try multiple field names
+        summary = item.get(
+            "summary",
+            item.get(
+                "abstractive_summary",
+                item.get("short_summary", item.get("label", "Summary to be generated")),
+            ),
+        )
+
+        # Handle list format (IL-TUR SUMM uses list of paragraphs)
+        if isinstance(summary, list):
+            summary = " ".join([str(p) for p in summary if p])
+
+        if not summary or summary == "":
+            summary = "A concise summary capturing key facts, legal issues, arguments, and rulings."
+        else:
+            summary = str(summary)[:1000]
 
         messages = [
             {
@@ -428,7 +576,7 @@ class ILTURDataPrep:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"[TASK: Legal Summarization]\n\nDocument:\n{document}\n\nProvide a concise summary capturing key facts, arguments, and rulings.",
+                        "text": f"[TASK: Legal Summarization]\n\nDocument:\n{document}\n\nProvide a concise summary capturing key facts, legal issues, arguments, and rulings.",
                     }
                 ],
             },
@@ -576,7 +724,7 @@ def train_multitask_model(config: Config, dataset: Dataset):
 
     # Memory stats
     used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
-    print(f"[TRAIN] Training complete!")
+    print("[TRAIN] Training complete!")
     print(f"  Time: {round(trainer_stats.metrics['train_runtime'] / 60, 2)} minutes")
     print(f"  Peak memory: {used_memory} GB")
 
@@ -647,14 +795,34 @@ def test_multitask_inference(config: Config, rag_indexer: ZillizRAGIndexer):
             return_dict=True,
         ).to("cuda")
 
+        # Task-specific generation parameters for factual legal output
+        task_params = {
+            "LSI": {"temperature": 0.05, "top_p": 0.9, "top_k": 30},  # Most strict
+            "SUMM": {"temperature": 0.1, "top_p": 0.9, "top_k": 40},  # Very factual
+            "PCR": {
+                "temperature": 0.2,
+                "top_p": 0.95,
+                "top_k": 50,
+            },  # Slight flexibility
+        }
+
+        params = task_params.get(
+            test["task"], {"temperature": 0.1, "top_p": 0.9, "top_k": 40}
+        )
+
         print(f"\nQuery: {test['query'][:200]}...")
+        print(
+            f"Generation params: temp={params['temperature']}, top_p={params['top_p']}, top_k={params['top_k']}"
+        )
         print("\nAnswer:")
         _ = model.generate(
             **inputs,
             max_new_tokens=256,
-            temperature=1.0,
-            top_p=0.95,
-            top_k=64,
+            temperature=params["temperature"],
+            top_p=params["top_p"],
+            top_k=params["top_k"],
+            repetition_penalty=1.1,  # Avoid repetitive text
+            do_sample=True,
             streamer=TextStreamer(tokenizer, skip_prompt=True),
         )
 
