@@ -1,14 +1,29 @@
 import { NextRequest } from "next/server";
 
+interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+  documentIds?: string[];
+}
+
+interface DocumentMetadata {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
 interface QueryRequest {
   query: string;
   files?: string[];
+  conversation_history?: ConversationMessage[];
+  documents?: DocumentMetadata[];
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: QueryRequest = await request.json();
-    const { query, files } = body;
+    const { query, files, conversation_history, documents } = body;
 
     if (!query || typeof query !== "string") {
       return new Response(
@@ -25,7 +40,12 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${backendUrl}/query/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, files }),
+      body: JSON.stringify({
+        query,
+        files,
+        conversation_history,
+        documents,
+      }),
     });
 
     if (!response.ok) {

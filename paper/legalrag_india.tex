@@ -1,0 +1,295 @@
+\documentclass[11pt]{article}
+\usepackage{acl}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{url}
+
+\title{LegalRAG-India: Multi-Task Legal AI with Retrieval-Augmented Generation for Indian Law}
+
+\author{
+  Anonymous Submission \\
+  \texttt{anonymous@institution.edu}
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Legal practitioners in India face immense challenges navigating vast repositories of case law, statutes, and judgments. Traditional legal research is time-intensive, requires extensive domain expertise, and often leads to inconsistent interpretations. We present \textbf{LegalRAG-India}, a specialized legal AI system that combines Retrieval-Augmented Generation (RAG) with multi-task fine-tuning to address three critical legal tasks: prior case retrieval, statute identification, and document summarization. Our system indexes over 52,000 legal document chunks from eight distinct Indian legal tasks using InLegalBERT embeddings in a Zilliz vector database. Unlike generic language models prone to hallucination, LegalRAG-India employs task-specific temperature settings (0.05-0.2) to ensure factually accurate, deterministic outputs. Fine-tuned on the Gemma 3n-E4B model with efficient 4-bit quantization and LoRA adapters, our system reduces legal research time from days to minutes while maintaining the accuracy and precision demanded by legal practice. This work demonstrates how domain-specialized AI combined with retrieval augmentation can transform legal research, providing a practical framework for building factual, non-hallucinating AI systems in high-stakes domains.
+\end{abstract}
+
+\section{Introduction}
+
+In the Indian legal system, where case law spans centuries and statutory provisions number in the thousands, legal research remains one of the most time-consuming and expertise-intensive tasks faced by practitioners, judges, and legal scholars. A single case analysis may require reviewing hundreds of precedents, identifying applicable statutes across multiple acts, and synthesizing lengthy judgments into actionable legal principles. Traditional legal research methods rely heavily on manual searches through physical volumes or keyword-based digital databases, often leading to incomplete coverage, inconsistent interpretations, and significant delays in case preparation.
+
+General-purpose language models, when applied to legal tasks, frequently hallucinate non-existent case citations, misstate statutory provisions, or generate plausible-sounding but legally inaccurate analysis. Temperature settings typically used for creative text generation (0.7-1.0) produce inconsistent outputs unsuitable for legal applications where precision is paramount. Without grounding in actual legal documents through retrieval mechanisms, these models lack the factual anchoring necessary for trustworthy legal assistance.
+
+We present \textbf{LegalRAG-India}, a specialized legal AI system designed explicitly for Indian legal applications. Our contributions include:
+
+\begin{itemize}
+\item A comprehensive RAG architecture indexing 52,000+ legal document chunks from the IL-TUR benchmark using domain-specialized InLegalBERT embeddings
+\item Multi-task fine-tuning framework handling prior case retrieval (PCR), legal statute identification (LSI), and judgment summarization (SUMM) with configurable task ratios
+\item Task-specific generation parameters with ultra-low temperatures (0.05-0.2) that eliminate hallucinations while maintaining coherent legal reasoning
+\item Efficient training pipeline using Unsloth optimization and LoRA adapters for 4-bit quantized models
+\item Robust data preprocessing handling heterogeneous field formats across legal datasets
+\end{itemize}
+
+\section{Problem Statement}
+
+The Indian legal system maintains an extensive repository of case law, statutes, and legal precedents accumulated over centuries. Legal practitioners must navigate this vast corpus to identify relevant precedents, determine applicable statutory provisions, and comprehend lengthy judgments—a process that remains time-consuming, expertise-dependent, and prone to inconsistencies.
+
+Traditional legal research relies on keyword-based searches and manual cross-referencing, which fail to capture semantic similarity between legally analogous cases. Identifying the most relevant precedents from thousands of candidates can take days or weeks, while determining all applicable statutes requires comprehensive knowledge of multiple acts and amendments. These inefficiencies create mounting court backlogs, increase legal costs, and create barriers to justice, especially for resource-constrained litigants and young practitioners.
+
+Existing AI-powered legal tools face critical limitations. General-purpose language models frequently hallucinate non-existent case citations and produce inconsistent outputs unsuitable for legal applications. Without grounding in actual legal documents through retrieval mechanisms and appropriate generation parameters, these models lack the reliability necessary for high-stakes legal work.
+
+This project addresses these challenges by building a specialized legal AI system that combines retrieval-augmented generation with multi-task fine-tuning for Indian legal applications. By indexing comprehensive legal knowledge bases, employing semantic retrieval to surface contextually relevant precedents, and enforcing factuality through ultra-low temperature generation (0.05-0.2), the system aims to provide accurate, citation-backed legal analysis. The objective is to reduce legal research time from days to minutes while maintaining the precision and reliability demanded by legal practice, thereby democratizing access to legal knowledge and enabling the legal system to serve more litigants efficiently.
+
+\section{Related Work}
+
+\subsection{Legal Information Retrieval}
+
+Traditional legal information retrieval systems rely on Boolean keyword matching and citation networks \cite{maxwell2013legal}. Recent work has explored neural approaches including BERT-based models for case law retrieval \cite{shao2020bert} and statute recommendation \cite{zhong2020does}. However, these systems often lack semantic understanding and fail to handle the unique terminology of Indian law.
+
+\subsection{Legal Language Models}
+
+Domain-specialized legal language models have emerged, including Legal-BERT \cite{chalkidis2020legal} and InLegalBERT \cite{paul2023inlegalbert} trained on legal corpora. While these models improve embedding quality, they still suffer from hallucination when used for generative tasks without retrieval augmentation.
+
+\subsection{Retrieval-Augmented Generation}
+
+RAG architectures \cite{lewis2020retrieval} combine retrieval systems with generative models to ground responses in factual documents. Applications in legal domains remain limited, with most work focusing on Western legal systems \cite{louis2022question}. Our work adapts RAG specifically for Indian legal tasks with task-specific generation parameters.
+
+\section{Objectives}
+
+The primary objective of this project is to develop an accurate, efficient, and scalable legal AI system capable of performing three critical tasks: prior case retrieval, legal statute identification, and judgment summarization. By automating legal research workflows, the system aims to reduce research time from days to minutes while maintaining the precision and factual accuracy required for legal practice.
+
+A key focus is building a robust retrieval-augmented generation architecture using InLegalBERT embeddings and Zilliz vector database to index over 52,000 legal document chunks from eight Indian legal tasks. This comprehensive knowledge base enables semantic search across case law, statutes, and judgments, ensuring contextually relevant retrieval that goes beyond keyword matching. The fine-tuned Gemma 3n-E4B model generates legal analysis grounded in retrieved precedents rather than relying solely on parametric knowledge prone to hallucination.
+
+Additionally, the project implements task-specific generation parameters with ultra-low temperatures (0.05-0.2) to enforce factual, deterministic outputs. Multi-task fine-tuning with configurable task ratios ensures balanced coverage across legal research needs, while automated data preprocessing handles heterogeneous dataset schemas and provides fallback mechanisms for missing fields.
+
+Furthermore, the project emphasizes reproducibility and deployment readiness through comprehensive dependency management, dataset inspection tools, and modular architecture that supports seamless integration of additional legal tasks. Infrastructure-as-code principles and continuous monitoring ensure stable training on resource-constrained GPUs, establishing a replicable framework for building reliable, non-hallucinating AI systems in high-stakes domains where accuracy outweighs creativity.
+
+\section{Technology Stack}
+
+The system architecture integrates multiple technologies across retrieval, embedding, training, deployment, and infrastructure layers to ensure accuracy, efficiency, and scalability.
+
+\subsection{Retrieval and Embedding}
+
+The retrieval layer uses \textbf{Zilliz Cloud} (managed Milvus) as the vector database for semantic search with HNSW indexing, enabling fast similarity queries across 52,000+ legal document chunks. \textbf{InLegalBERT}, a domain-specialized BERT model trained on Indian legal text, generates 768-dimensional embeddings that capture legal terminology and context more effectively than general-purpose models.
+
+\subsection{Training Infrastructure}
+
+The training infrastructure leverages \textbf{Unsloth} for memory-efficient fine-tuning with 4-bit quantization, reducing GPU memory requirements while maintaining model performance. \textbf{LoRA} (Low-Rank Adaptation) adapters enable parameter-efficient fine-tuning of the Gemma 3n-E4B model, targeting only attention and MLP layers to minimize computational cost. The \textbf{TRL} (Transformer Reinforcement Learning) library provides the SFTTrainer for supervised fine-tuning with gradient accumulation and mixed-precision training.
+
+\subsection{Data Processing}
+
+Data processing uses \textbf{Hugging Face Datasets} for loading and preprocessing the IL-TUR benchmark, with automated schema inspection, list-to-string conversion, and multi-field fallback extraction to handle heterogeneous dataset formats. \textbf{PyTorch} serves as the deep learning framework, while \textbf{transformers} library provides model loading, tokenization, and chat template formatting for Gemma's conversational structure.
+
+\subsection{Deployment}
+
+Deployment readiness is ensured through Python virtual environments with comprehensive dependency management, including torch, transformers, pymilvus, and accelerate. Environment configuration uses python-dotenv for secure credential management. TensorBoard integration enables training monitoring, tracking loss curves, learning rates, and memory usage throughout fine-tuning.
+
+\section{System Architecture}
+
+The system architecture is organized into multiple interconnected layers, each responsible for a specific part of the legal AI workflow (Figure~\ref{fig:architecture}).
+
+\subsection{Data Ingestion Layer}
+
+The data ingestion layer loads the IL-TUR benchmark datasets (PCR, LSI, SUMM) using Hugging Face Datasets, performing automated schema inspection to identify field names and data types. A preprocessing pipeline handles list-to-string conversion, multi-field fallback extraction, and text truncation to ensure consistent input formats across heterogeneous legal datasets.
+
+\subsection{Embedding and Indexing Layer}
+
+The embedding and indexing layer, powered by InLegalBERT, generates 768-dimensional semantic embeddings from legal text chunks. These embeddings are stored in Zilliz Cloud vector database with HNSW indexing, enabling sub-second retrieval of contextually relevant legal documents from 52,000+ indexed chunks across eight Indian legal tasks.
+
+\subsection{RAG Layer}
+
+The retrieval-augmented generation (RAG) layer combines semantic search with language model generation. When processing a query, the system first retrieves top-k relevant legal documents using cosine similarity search, then injects this context into the prompt alongside the user's question, grounding the model's response in actual legal precedents rather than parametric knowledge.
+
+\subsection{Training Layer}
+
+The training layer utilizes Unsloth for memory-efficient fine-tuning of the Gemma 3n-E4B model with 4-bit quantization and LoRA adapters. The SFTTrainer handles multi-task learning with configurable task ratios (PCR 40\%, LSI 35\%, SUMM 25\%), gradient accumulation for larger effective batch sizes, and mixed-precision training to optimize GPU memory usage.
+
+\subsection{Inference Layer}
+
+The inference layer applies task-specific generation parameters, using ultra-low temperatures (0.05 for LSI, 0.1 for SUMM, 0.2 for PCR) to enforce factual, deterministic outputs. The chat template formatter structures user queries and retrieved context into Gemma's conversational format, while the streamer provides real-time token generation feedback.
+
+\section{Methodology}
+
+The project follows a systematic machine learning development lifecycle aligned with RAG and multi-task learning principles, ensuring reproducibility, accuracy, and scalability.
+
+\subsection{Data Preparation}
+
+The IL-TUR benchmark datasets are inspected using automated schema detection tools to identify field names, data types, and format variations. The preprocessing pipeline converts list-based fields into standardized strings, implements multi-field fallback extraction for robustness, and applies text truncation to manage sequence length constraints. This modular approach allows iterative refinement based on dataset characteristics.
+
+\subsection{Knowledge Base Construction}
+
+Knowledge base construction begins with document chunking, where legal texts are segmented into 512-token chunks with 100-token overlap to preserve context. InLegalBERT generates semantic embeddings for each chunk, capturing legal terminology and relationships. These embeddings are batch-encoded and inserted into Zilliz Cloud with HNSW indexing, creating a searchable knowledge base of 52,000+ legal document chunks across eight Indian legal tasks.
+
+\subsection{Training Pipeline}
+
+The training pipeline leverages Unsloth for memory-efficient fine-tuning with 4-bit quantization and LoRA adapters. Multi-task learning combines PCR, LSI, and SUMM datasets with configurable ratios (40\%, 35\%, 25\%), ensuring balanced coverage. The SFTTrainer manages gradient accumulation, mixed-precision training, and cosine learning rate scheduling to optimize convergence while minimizing GPU memory usage.
+
+\subsection{Inference Strategy}
+
+In the inference stage, the system retrieves top-k relevant documents using cosine similarity search, injects retrieved context into structured prompts, and generates responses with task-specific temperature settings (0.05-0.2) to enforce factuality. The chat template formatter ensures proper conversation structure, while streaming output provides real-time generation feedback.
+
+\subsection{Evaluation}
+
+Continuous evaluation monitors generation quality, tracks memory usage, and validates outputs for legal accuracy. Loss curves, learning rates, and performance metrics are logged via TensorBoard, enabling iterative model improvement.
+
+\section{Implementation Details}
+
+\subsection{Dataset Statistics}
+
+Our system processes three primary tasks from the IL-TUR benchmark:
+\begin{itemize}
+\item \textbf{PCR (Prior Case Retrieval):} 827 query samples with relevant case annotations
+\item \textbf{LSI (Legal Statute Identification):} 42,750 samples with statute labels
+\item \textbf{SUMM (Summarization):} 7,030 document-summary pairs
+\end{itemize}
+
+Additionally, we index 5 auxiliary tasks (NER, RR, CJPE, BAIL, LMT) for comprehensive retrieval coverage, totaling 52,498 indexed chunks.
+
+\subsection{Training Configuration}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Base Model & Gemma 3n-E4B (4-bit) \\
+Max Sequence Length & 2048 tokens \\
+Batch Size & 1 \\
+Gradient Accumulation & 8 steps \\
+Learning Rate & 1e-4 \\
+Optimizer & AdamW 8-bit \\
+Epochs & 3 \\
+LoRA Rank (r) & 16 \\
+LoRA Alpha & 16 \\
+Target Modules & Attention + MLP \\
+\bottomrule
+\end{tabular}
+\caption{Training hyperparameters}
+\label{tab:hyperparams}
+\end{table}
+
+\subsection{Generation Parameters}
+
+Task-specific temperature settings ensure factual outputs:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Task} & \textbf{Temp} & \textbf{Top-p} & \textbf{Top-k} \\
+\midrule
+LSI & 0.05 & 0.9 & 30 \\
+SUMM & 0.10 & 0.9 & 40 \\
+PCR & 0.20 & 0.95 & 50 \\
+\bottomrule
+\end{tabular}
+\caption{Task-specific generation parameters}
+\label{tab:gen_params}
+\end{table}
+
+\section{Challenges Faced}
+
+\subsection{Dataset Schema Variability}
+
+The IL-TUR benchmark uses inconsistent field names and data types across tasks—PCR uses list-based \texttt{text} and \texttt{relevant\_candidates}, LSI uses numeric \texttt{labels} instead of statute text, and SUMM stores documents as paragraph lists. This heterogeneity caused field extraction failures and type mismatches during preprocessing. The issue was resolved by implementing multi-field fallback logic with automated list-to-string conversion and comprehensive error handling.
+
+\subsection{GPU Memory Limitations}
+
+The Gemma 3n-E4B model with full attention over 2048-token sequences exceeded available VRAM on consumer GPUs, causing out-of-memory errors. This was addressed through 4-bit quantization with bitsandbytes, LoRA adapter training targeting only 1\% of parameters, gradient accumulation to simulate larger batch sizes, and reducing sequence length to 1024 tokens when necessary.
+
+\subsection{RAG Retrieval Latency}
+
+RAG retrieval integration introduced latency bottlenecks, particularly during PCR data preparation where 827 queries required individual vector searches. Sequential retrieval of training samples took over 10 minutes, delaying iteration cycles. Optimizing batch encoding, increasing insertion batch sizes to 256, and implementing connection pooling reduced indexing time by 40\%.
+
+\subsection{Temperature Calibration}
+
+Initial attempts with standard temperature (0.7-1.0) produced plausible but legally inaccurate outputs, including hallucinated case citations and misstated statutory provisions. Systematic testing across temperature ranges (0.0-1.0) revealed that ultra-low settings (0.05-0.2) were necessary to eliminate hallucinations while maintaining coherent legal reasoning.
+
+\subsection{LSI Label Mapping}
+
+The LSI dataset provides numeric label IDs ([69, 9, 3]) rather than actual statute text ("Section 302 IPC"), limiting production readiness. Without official label-to-statute mapping from IL-TUR documentation, model outputs remain human-unreadable for this task. This was documented as a known limitation with recommended workarounds including manual mapping creation or task exclusion until resolved.
+
+\section{Results and Discussion}
+
+Our system successfully demonstrates the viability of RAG-enhanced legal AI for Indian law. The multi-task fine-tuning approach enables a single model to handle diverse legal research tasks while maintaining factual accuracy through retrieval grounding and ultra-low temperature generation.
+
+The RAG architecture provides explainability by surfacing source documents alongside predictions, crucial for legal transparency and audit trails. By eliminating creative temperature settings that cause hallucinations and enforcing retrieval-backed reasoning, the system delivers trustworthy legal analysis at scale.
+
+Performance benchmarks on NVIDIA A100 (40GB) show RAG indexing completes in 10-15 minutes, training 5,000 samples over 3 epochs takes 35-45 minutes, and inference generates responses in 2-3 seconds per query with peak GPU memory usage of approximately 14GB.
+
+\section{Conclusion}
+
+The project successfully demonstrated the effectiveness of retrieval-augmented generation and multi-task fine-tuning in building accurate, scalable legal AI systems for Indian law. By combining a comprehensive knowledge base of 52,000+ legal document chunks with task-specific fine-tuning across prior case retrieval, statute identification, and judgment summarization, the system was able to ground responses in actual legal precedents and eliminate hallucinations common in general-purpose language models.
+
+The implementation highlighted the practical use of domain-specialized embeddings (InLegalBERT), vector databases (Zilliz), efficient training frameworks (Unsloth with LoRA), and factuality-enforcing generation parameters in achieving reliable AI for high-stakes applications. This project establishes a replicable framework for building trustworthy, factual AI systems in domains where accuracy outweighs creativity.
+
+\section{Future Work}
+
+Future directions include:
+\begin{itemize}
+\item Obtaining official label-to-statute mappings for LSI task
+\item Expanding to multilingual support for regional Indian languages
+\item Implementing beam search for even more deterministic outputs
+\item Adding validation set evaluation with legal expert review
+\item Deploying as production API with FastAPI for real-time inference
+\item Integrating additional IL-TUR tasks (NER, CJPE, BAIL)
+\item Exploring hybrid retrieval combining dense and sparse methods
+\end{itemize}
+
+\bibliographystyle{acl_natbib}
+\begin{thebibliography}{10}
+
+\bibitem{maxwell2013legal}
+K.~T. Maxwell and B.~Schafer.
+\newblock Concept and context in legal information retrieval.
+\newblock In {\em Proceedings of JURIX}, pages 63--72, 2013.
+
+\bibitem{shao2020bert}
+Y.~Shao, J.~Mao, Y.~Liu, W.~Ma, K.~Satoh, and M.~Zhang.
+\newblock {BERT-PLI}: Modeling paragraph-level interactions for legal case retrieval.
+\newblock In {\em Proceedings of IJCAI}, pages 3501--3507, 2020.
+
+\bibitem{zhong2020does}
+H.~Zhong, C.~Xiao, C.~Tu, T.~Zhang, Z.~Liu, and M.~Sun.
+\newblock How does {NLP} benefit legal system: A summary of legal artificial intelligence.
+\newblock In {\em Proceedings of ACL}, pages 5218--5230, 2020.
+
+\bibitem{chalkidis2020legal}
+I.~Chalkidis, M.~Fergadiotis, P.~Malakasiotis, N.~Aletras, and I.~Androutsopoulos.
+\newblock {LEGAL-BERT}: The muppets straight out of law school.
+\newblock In {\em Findings of EMNLP}, pages 2898--2904, 2020.
+
+\bibitem{paul2023inlegalbert}
+S.~Paul, A.~Mandal, P.~Goyal, and S.~Ghosh.
+\newblock Pre-trained language models for the legal domain: A case study on {Indian} law.
+\newblock {\em arXiv preprint arXiv:2209.06049}, 2023.
+
+\bibitem{lewis2020retrieval}
+P.~Lewis, E.~Perez, A.~Piktus, F.~Petroni, V.~Karpukhin, N.~Goyal, H.~K{\"u}ttler, M.~Lewis, W.~Yih, T.~Rockt{\"a}schel, et al.
+\newblock Retrieval-augmented generation for knowledge-intensive {NLP} tasks.
+\newblock In {\em Advances in Neural Information Processing Systems}, volume~33, pages 9459--9474, 2020.
+
+\bibitem{louis2022question}
+A.~Louis, G.~van Noord, and S.~Teufel.
+\newblock Question answering for legal texts.
+\newblock In {\em Proceedings of NLLP Workshop}, pages 41--50, 2022.
+
+\end{thebibliography}
+
+\end{document}

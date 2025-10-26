@@ -45,7 +45,9 @@ export async function queryRAGSystem(query: string): Promise<QueryResponse> {
  * @param query - User's legal question
  * @returns Promise with answer and metadata
  */
-export async function queryBackendDirect(query: string): Promise<QueryResponse> {
+export async function queryBackendDirect(
+  query: string,
+): Promise<QueryResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/query`, {
       method: "POST",

@@ -37,9 +37,24 @@ app.add_middleware(
 
 
 # Request/Response Models
+class ConversationMessage(BaseModel):
+    role: str
+    content: str
+    documentIds: Optional[List[str]] = None
+
+
+class DocumentMetadata(BaseModel):
+    id: str
+    name: str
+    size: int
+    type: str
+
+
 class QueryRequest(BaseModel):
     query: str
     files: Optional[List[str]] = None
+    conversation_history: Optional[List[ConversationMessage]] = None
+    documents: Optional[List[DocumentMetadata]] = None
 
 
 class HealthResponse(BaseModel):
@@ -58,16 +73,27 @@ MOCK_LEGAL_RESPONSES = {
 
 
 async def generate_legal_response(
-    query: str, files: Optional[List[str]] = None
+    query: str,
+    files: Optional[List[str]] = None,
+    conversation_history: Optional[List[ConversationMessage]] = None,
+    documents: Optional[List[DocumentMetadata]] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Generate streaming legal response
 
     This is a mock implementation. Replace with actual RAG system:
     - Use legal_rag_qa.LegalRAGSystem for document retrieval
-    - Stream tokens from Mistral-7B as they're generated
+    - Stream tokens from Gemma-3n-E4B (4-bit quantized) as they're generated
     - Calculate CJPE score from retrieved documents
+    - Use conversation_history for contextual responses
+    - Use documents metadata for document-aware retrieval
     """
+
+    # Log conversation context
+    if conversation_history:
+        print(f"[INFO] Processing query with {len(conversation_history)} messages in history")
+    if documents:
+        print(f"[INFO] {len(documents)} documents available for context")
 
     # Simulate retrieval phase
     await asyncio.sleep(0.1)
@@ -121,9 +147,11 @@ async def generate_legal_response(
         "metadata": {
             "retrieval_time_ms": 150,
             "generation_time_ms": len(words) * 30,
-            "model_version": "mistral-7b-instruct-v0.3",
+            "model_version": "gemma-3n-E4B-4bit-finetuned",
             "retrieval_model": "InLegalBERT",
             "timestamp": time.time(),
+            "conversation_turns": len(conversation_history) if conversation_history else 0,
+            "documents_count": len(documents) if documents else 0,
         },
     }
 
@@ -133,7 +161,7 @@ async def generate_legal_response(
 @app.post("/query/stream")
 async def query_stream(request: QueryRequest):
     """
-    Streaming endpoint for legal queries
+    Streaming endpoint for legal queries with conversation history
 
     Returns Server-Sent Events (SSE) stream with:
     1. Incremental text response
@@ -143,7 +171,14 @@ async def query_stream(request: QueryRequest):
         POST /query/stream
         {
             "query": "What are grounds for termination?",
-            "files": ["contract.pdf"]
+            "files": ["contract.pdf"],
+            "conversation_history": [
+                {"role": "user", "content": "Tell me about employment law", "documentIds": []},
+                {"role": "assistant", "content": "Employment law governs...", "documentIds": []}
+            ],
+            "documents": [
+                {"id": "doc-123", "name": "contract.pdf", "size": 12345, "type": "application/pdf"}
+            ]
         }
     """
     try:
@@ -152,16 +187,21 @@ async def query_stream(request: QueryRequest):
 
         if len(request.query) > 2000:
             raise HTTPException(
-                status_code=400, detail="Query too long (max 2000 chars)"
+                status_code=400, detail="Query too long (max 2000 characters)"
             )
 
         return StreamingResponse(
-            generate_legal_response(request.query, request.files),
+            generate_legal_response(
+                request.query,
+                request.files,
+                request.conversation_history,
+                request.documents,
+            ),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # Disable nginx buffering
+                "X-Accel-Buffering": "no",
             },
         )
 

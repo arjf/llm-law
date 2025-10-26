@@ -2,12 +2,22 @@
 
 import { useState, useRef, useEffect } from "react";
 
+interface UploadedDocument {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  file: File;
+  uploadedAt: Date;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  documentIds?: string[];
 }
 
 interface ChatInterfaceProps {
@@ -19,6 +29,7 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,16 +50,56 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleDocumentClick = (doc: UploadedDocument) => {
+    // Create a download link for the document
+    const url = URL.createObjectURL(doc.file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = doc.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const removeDocument = (docId: string) => {
+    setDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if ((!input.trim() && uploadedFiles.length === 0) || isLoading) return;
 
+    // Create document objects from uploaded files
+    const newDocs: UploadedDocument[] = uploadedFiles.map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file: file,
+      uploadedAt: new Date(),
+    }));
+
+    const docIds = newDocs.map((doc) => doc.id);
+
+    // Add documents to persistent state
+    if (newDocs.length > 0) {
+      setDocuments((prev) => [...prev, ...newDocs]);
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim() || `Uploaded ${uploadedFiles.length} document(s)`,
+      content: input.trim() || `Analyzing ${uploadedFiles.length} document(s)`,
       timestamp: new Date(),
+      documentIds: docIds.length > 0 ? docIds : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -68,13 +119,37 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
-      // Call streaming API
+      // Prepare conversation history
+      const conversationHistory = messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+        documentIds: msg.documentIds,
+      }));
+
+      // Add current user message to history
+      conversationHistory.push({
+        role: userMessage.role,
+        content: userMessage.content,
+        documentIds: userMessage.documentIds,
+      });
+
+      // Prepare document metadata
+      const documentMetadata = documents.map((doc) => ({
+        id: doc.id,
+        name: doc.name,
+        size: doc.size,
+        type: doc.type,
+      }));
+
+      // Call streaming API with full context
       const response = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: userMessage.content,
           files: uploadedFiles.map((f) => f.name),
+          conversation_history: conversationHistory,
+          documents: documentMetadata,
         }),
       });
 
@@ -143,7 +218,7 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
       );
 
       setIsLoading(false);
-      setUploadedFiles([]);
+      setUploadedFiles([]); // Clear temporary upload state
     } catch (error) {
       console.error("Error querying RAG system:", error);
 
@@ -179,6 +254,86 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
           Ask questions about Indian employment and workplace law
         </p>
       </div>
+
+      {/* Persistent Documents Area */}
+      {documents.length > 0 && (
+        <div className="border-b border-border-light dark:border-border-dark px-6 py-3 bg-surface-light dark:bg-surface-dark">
+          <div className="flex items-center gap-2 mb-2">
+            <svg
+              className="w-4 h-4 text-primary-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Uploaded Documents ({documents.length})
+            </h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="group relative flex items-center gap-2 px-3 py-2 bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark rounded-lg hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-200 cursor-pointer"
+                onClick={() => handleDocumentClick(doc)}
+                title={`Click to download ${doc.name}`}
+              >
+                <svg
+                  className="w-4 h-4 text-primary-500 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate max-w-[200px]">
+                    {doc.name}
+                  </span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                    {formatFileSize(doc.size)} •{" "}
+                    {doc.uploadedAt.toLocaleDateString()}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeDocument(doc.id);
+                  }}
+                  className="ml-2 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Remove document"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+                <div className="absolute inset-0 rounded-lg ring-2 ring-primary-500 opacity-0 group-hover:opacity-20 transition-opacity pointer-events-none" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {messages.length === 0 ? (
@@ -296,6 +451,40 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
                           <span className="inline-block w-2 h-4 ml-1 bg-primary-500 animate-pulse" />
                         )}
                       </p>
+                      {message.documentIds &&
+                        message.documentIds.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {message.documentIds.map((docId) => {
+                              const doc = documents.find((d) => d.id === docId);
+                              if (!doc) return null;
+                              return (
+                                <button
+                                  key={docId}
+                                  onClick={() => handleDocumentClick(doc)}
+                                  className="flex items-center gap-1.5 px-2 py-1 bg-white/10 hover:bg-white/20 dark:bg-black/10 dark:hover:bg-black/20 rounded text-xs transition-colors"
+                                  title={`Click to download ${doc.name}`}
+                                >
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                                    />
+                                  </svg>
+                                  <span className="truncate max-w-[120px]">
+                                    {doc.name}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       <p
                         className={`text-xs mt-2 ${
                           message.role === "user"

@@ -40,7 +40,7 @@ export default function Home() {
                         Model
                       </span>
                       <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                        Mistral-7B
+                        Gemma-3n-E4B (4-bit)
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
