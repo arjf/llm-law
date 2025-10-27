@@ -47,17 +47,40 @@ export default function Home() {
                       <span className="text-xs text-gray-600 dark:text-gray-400">
                         Model
                       </span>
-                      <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                        Gemma-3n-E4B (4-bit)
-                      </span>
+                      <a
+                        href="https://huggingface.co/arjf/gemma-3n-IL-TUR-multitask"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-primary-500 hover:text-primary-400 transition-colors"
+                      >
+                        gemma-3n-IL-TUR-multitask
+                      </a>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-600 dark:text-gray-400">
                         Retrieval
                       </span>
-                      <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                      <a
+                        href="https://huggingface.co/law-ai/InLegalBERT"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-primary-500 hover:text-primary-400 transition-colors"
+                      >
                         InLegalBERT
+                      </a>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        Judgment
                       </span>
+                      <a
+                        href="https://huggingface.co/arjf/InLegalBERT-HiGRU-CJPE-Scorer"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-primary-500 hover:text-primary-400 transition-colors"
+                      >
+                        InLegalBERT-HiGRU-CJPE-Scorer
+                      </a>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-600 dark:text-gray-400">
