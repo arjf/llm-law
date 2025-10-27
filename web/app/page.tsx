@@ -7,9 +7,14 @@ import Navbar from "@/components/Navbar";
 
 export default function Home() {
   const [cjpeScore, setCjpeScore] = useState<number | undefined>(undefined);
+  const [cjpeLoading, setCjpeLoading] = useState(false);
 
   const handleScoreUpdate = (score: number) => {
     setCjpeScore(score);
+  };
+
+  const handleCJPELoading = (loading: boolean) => {
+    setCjpeLoading(loading);
   };
 
   return (
@@ -20,14 +25,17 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Main Chat Area */}
             <div className="lg:col-span-3 h-[calc(100vh-140px)]">
-              <ChatInterface onScoreUpdate={handleScoreUpdate} />
+              <ChatInterface
+                onScoreUpdate={handleScoreUpdate}
+                onCJPELoading={handleCJPELoading}
+              />
             </div>
 
             {/* Sidebar */}
             <div className="lg:col-span-1">
               <div className="sticky top-24 space-y-6">
                 {/* CJPE Score */}
-                <CJPEScore score={cjpeScore} loading={false} />
+                <CJPEScore score={cjpeScore} loading={cjpeLoading} />
 
                 {/* Quick Stats */}
                 <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-2xl p-6 border border-border-light dark:border-border-dark">

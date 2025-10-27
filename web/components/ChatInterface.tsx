@@ -22,9 +22,13 @@ interface Message {
 
 interface ChatInterfaceProps {
   onScoreUpdate?: (score: number) => void;
+  onCJPELoading?: (loading: boolean) => void;
 }
 
-export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
+export default function ChatInterface({
+  onScoreUpdate,
+  onCJPELoading,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -141,7 +145,28 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
         type: doc.type,
       }));
 
-      // Call streaming API with full context
+      // Call CJPE API in parallel (don't await)
+      if (onCJPELoading) onCJPELoading(true);
+
+      fetch("/api/cjpe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: userMessage.content }),
+      })
+        .then((res) => res.json())
+        .then((cjpeData) => {
+          // Update CJPE score immediately when available
+          if (onScoreUpdate && cjpeData.probabilities) {
+            onScoreUpdate(cjpeData.probabilities.favorable);
+          }
+          if (onCJPELoading) onCJPELoading(false);
+        })
+        .catch((err) => {
+          console.error("CJPE prediction error:", err);
+          if (onCJPELoading) onCJPELoading(false);
+        });
+
+      // Call Gemma streaming API
       const response = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -189,7 +214,7 @@ export default function ChatInterface({ onScoreUpdate }: ChatInterfaceProps) {
             );
           }
 
-          // Parse and handle metadata
+          // Parse and handle metadata (legacy support)
           try {
             const metadata = JSON.parse(metadataPart.trim());
             if (onScoreUpdate && metadata.cjpe_score) {

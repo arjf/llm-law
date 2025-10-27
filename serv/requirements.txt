@@ -1,21 +1,31 @@
+# FastAPI and server dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic==2.5.0
 
+# PyTorch and ML frameworks
 torch>=2.0.0
 transformers>=4.35.0
 datasets>=2.14.0
 huggingface-hub>=0.19.0
 accelerate>=0.24.0
 
+# Quantization and optimization
+bitsandbytes>=0.41.0
+peft>=0.7.0
+
+# Vector database (Milvus/Zilliz Cloud)
+pymilvus>=2.3.0
+
+# Scientific computing
 numpy>=1.24.0
 scipy>=1.11.0
 
+# Utilities
 python-dotenv>=1.0.0
 tqdm>=4.66.0
 
-bitsandbytes>=0.41.0
-
+# Security (optional, for future auth)
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
