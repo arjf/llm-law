@@ -105,7 +105,7 @@ pymilvus==2.6.2
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-jose==3.5.0
-python-multipart==0.0.6
+python-multipart==0.0.18
 pytokens==0.2.0
 pytz==2025.2
 PyYAML==6.0.3
