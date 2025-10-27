@@ -4,18 +4,6 @@
   "installCommand": "pnpm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "env": {
-    "NEXT_PUBLIC_GEMMA_API_URL": "@gemma-api-url",
-    "NEXT_PUBLIC_CJPE_API_URL": "@cjpe-api-url",
-    "NEXT_PUBLIC_API_URL": "@api-url"
-  },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_GEMMA_API_URL": "@gemma-api-url",
-      "NEXT_PUBLIC_CJPE_API_URL": "@cjpe-api-url",
-      "NEXT_PUBLIC_API_URL": "@api-url"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/:path*",
